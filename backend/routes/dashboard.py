@@ -4,12 +4,15 @@ from __future__ import annotations
 from flask import Blueprint, jsonify
 
 from backend.database import get_db_health
+from backend.security import login_required, roles_required
 
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
 
 @dashboard_bp.get("/health")
+@login_required
+@roles_required("admin", "bank", "lea", "victim")
 def get_database_health():
     """Return a simple SQLite-backed database health/status envelope.
 
@@ -20,6 +23,8 @@ def get_database_health():
 
 
 @dashboard_bp.get("/stats")
+@login_required
+@roles_required("admin", "bank", "lea", "victim")
 def get_dashboard_stats():
     """Return synthetic dashboard KPIs in a machine-readable JSON shape."""
     return jsonify({

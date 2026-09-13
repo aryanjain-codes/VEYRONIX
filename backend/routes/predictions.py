@@ -8,11 +8,14 @@ from flask import Blueprint, jsonify, request
 
 from backend.database import get_db_connection
 from backend.ml.predictor import predict
+from backend.security import login_required, roles_required
 
 predictions_bp = Blueprint("predictions", __name__)
 
 
 @predictions_bp.post("")
+@login_required
+@roles_required("admin", "bank", "lea", "victim")
 def create_prediction():
     """Return a model-backed predictive intelligence lead for complaint and transaction features.
 
@@ -20,6 +23,9 @@ def create_prediction():
     structure. The data is synthetic/demo only and should not be treated as proof.
     """
     payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        return jsonify({"success": False, "message": "JSON object required."}), 400
+
     try:
         result = predict(payload)
     except Exception as exc:

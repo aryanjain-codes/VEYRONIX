@@ -3,12 +3,41 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
+from backend.database import get_db_connection
+from backend.security import login_required, roles_required
+
 hotspots_bp = Blueprint("hotspots", __name__)
 
 
 @hotspots_bp.get("")
+@login_required
+@roles_required("admin", "bank", "lea", "victim")
 def list_hotspots():
     """Return a synthetic hotspots list, compatible with current frontend demo data expectations."""
+    conn = get_db_connection()
+    try:
+        rows = conn.execute(
+            "SELECT hotspot_id AS id, name, state, category, latitude AS lat, longitude AS lng, risk_score AS risk, time_window_hours AS window, tier FROM hotspots ORDER BY risk_score DESC LIMIT 50"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    if rows:
+        data = []
+        for row in rows:
+            data.append({
+                "id": row["id"],
+                "name": row["name"],
+                "state": row["state"],
+                "category": row["category"],
+                "lat": row["lat"],
+                "lng": row["lng"],
+                "risk": row["risk"],
+                "window": row["window"],
+                "tier": row["tier"],
+            })
+        return jsonify({"success": True, "data": data})
+
     sample_hotspots = [
         {
             "id": "h1",

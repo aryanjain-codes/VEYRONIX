@@ -4,6 +4,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from werkzeug.security import generate_password_hash
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "veyronix.db"
@@ -130,14 +132,18 @@ def seed_demo_data(conn: sqlite3.Connection) -> None:
     if conn.execute("SELECT 1 FROM users LIMIT 1").fetchone() is None:
         conn.execute(
             "INSERT INTO users (name, email, password_hash, role, organization) VALUES (?, ?, ?, ?, ?)",
-            ("Demo Admin", "admin@veyronix.demo", "synthetic_hash", "admin", "I4C Demo"),
+            ("Demo Admin", "admin@veyronix.demo", generate_password_hash("synthetic_hash"), "admin", "I4C Demo"),
         )
         conn.execute(
             "INSERT INTO users (name, email, password_hash, role, organization) VALUES (?, ?, ?, ?, ?)",
-            ("Demo Analyst", "analyst@veyronix.demo", "synthetic_hash", "analyst", "Cyber Crime Wing"),
+            ("Demo LEA", "lea@veyronix.demo", generate_password_hash("synthetic_hash"), "lea", "Cyber Crime Wing"),
         )
 
     if conn.execute("SELECT 1 FROM complaints LIMIT 1").fetchone() is None:
+        conn.execute(
+            "INSERT INTO complaints (complaint_id, complainant_name, fraud_type, amount, city, bank, branch, complaint_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("NCRP-SYNTHETIC-SIH26184-DEL-001", "Synthetic Complainant", "Digital-arrest scam", 85000.0, "Srinagar", "State Bank of India", "Mehjoor Nagar, Srinagar", "2026-09-14", "new"),
+        )
         conn.execute(
             "INSERT INTO complaints (complaint_id, complainant_name, fraud_type, amount, city, bank, branch, complaint_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             ("NCRP-2026-100001", "Demo Complainant", "UPI / payment fraud", 185000.0, "Delhi", "State Bank of India", "Central Branch", "2026-09-14", "new"),
@@ -160,6 +166,10 @@ def seed_demo_data(conn: sqlite3.Connection) -> None:
     if conn.execute("SELECT 1 FROM predictions LIMIT 1").fetchone() is None:
         conn.execute(
             "INSERT INTO predictions (prediction_id, complaint_id, fraud_type, city, bank, risk_score, risk_tier, window_hours, cash_out_point, explanation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("PRED-SYNTHETIC-SIH26184-001", "NCRP-SYNTHETIC-SIH26184-DEL-001", "Digital-arrest scam", "Srinagar", "State Bank of India", 75.0, "high", 48, "ATM-274, Mehjoor Nagar, Srinagar", "SYNTHETIC_DEMO: digital-arrest pattern, high amount, Srinagar city signal"),
+        )
+        conn.execute(
+            "INSERT INTO predictions (prediction_id, complaint_id, fraud_type, city, bank, risk_score, risk_tier, window_hours, cash_out_point, explanation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             ("PRED-2026-0001", "NCRP-2026-100001", "UPI / payment fraud", "Delhi", "State Bank of India", 76.0, "warn", 48, "ATM-110", "Synthetic demo explanation: suspicious mule clustering"),
         )
         conn.execute(
@@ -168,6 +178,10 @@ def seed_demo_data(conn: sqlite3.Connection) -> None:
         )
 
     if conn.execute("SELECT 1 FROM alerts LIMIT 1").fetchone() is None:
+        conn.execute(
+            "INSERT INTO alerts (alert_id, location, severity, message) VALUES (?, ?, ?, ?)",
+            ("ALERT-SYNTHETIC-SIH26184-001", "Mehjoor Nagar, Srinagar", "crit", "SYNTHETIC_DEMO: 3 ATMs · mule cluster forming · fund-freeze auto-drafted"),
+        )
         conn.execute(
             "INSERT INTO alerts (alert_id, location, severity, message) VALUES (?, ?, ?, ?)",
             ("ALERT-2026-0001", "Mehjoor Nagar, Srinagar", "crit", "3 ATMs · mule cluster forming · fund-freeze auto-drafted"),
@@ -180,6 +194,10 @@ def seed_demo_data(conn: sqlite3.Connection) -> None:
     if conn.execute("SELECT 1 FROM cases LIMIT 1").fetchone() is None:
         conn.execute(
             "INSERT INTO cases (case_id, location, severity, status, officer, opened_at, hotspot_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("CYB-SYNTHETIC-SIH26184-001", "Mehjoor Nagar, Srinagar", "crit", "new", "Insp. R. Kaul", "2026-09-14T09:41:02", "HSP-SYNTHETIC-SIH26184-001"),
+        )
+        conn.execute(
+            "INSERT INTO cases (case_id, location, severity, status, officer, opened_at, hotspot_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
             ("CYB-2026-4471", "Mehjoor Nagar, Srinagar", "crit", "new", "Insp. R. Kaul", "2026-09-14T09:41:02", "HSP-001"),
         )
         conn.execute(
@@ -188,6 +206,10 @@ def seed_demo_data(conn: sqlite3.Connection) -> None:
         )
 
     if conn.execute("SELECT 1 FROM audit_logs LIMIT 1").fetchone() is None:
+        conn.execute(
+            "INSERT INTO audit_logs (user, role, action, target) VALUES (?, ?, ?, ?)",
+            ("synthetic.demo", "SYNTHETIC_DEMO", "Analyzed complaint", "NCRP-SYNTHETIC-SIH26184-DEL-001"),
+        )
         conn.execute(
             "INSERT INTO audit_logs (user, role, action, target) VALUES (?, ?, ?, ?)",
             ("utkarsh.k", "I4C Admin", "Viewed", "Risk Heatmap — Srinagar cluster"),
