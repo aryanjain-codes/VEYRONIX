@@ -1,0 +1,14 @@
+transaction_id,complaint_id,amount,bank,city,branch,transaction_type,status,synthetic_data_flag
+TXN-2026-0001,NCRP-2026-100001,185000,State Bank of India,Delhi,Central Branch,UPI,pending,SYNTHETIC_DEMO
+TXN-2026-0002,NCRP-2026-100001,5000,State Bank of India,Delhi,Central Branch,UPI,cleared,SYNTHETIC_DEMO
+TXN-2026-0003,NCRP-2026-100002,120000,Jammu & Kashmir Bank,Srinagar,Mehjoor Nagar,ATM withdrawal,flagged,SYNTHETIC_DEMO
+TXN-2026-0004,NCRP-2026-100003,45000,ICICI Bank,Delhi,Connaught Place,UPI,flagged,SYNTHETIC_DEMO
+TXN-2026-0005,NCRP-2026-100004,70000,State Bank of India,Ranchi,Kotwali Branch,ATM withdrawal,flagged,SYNTHETIC_DEMO
+TXN-2026-0006,NCRP-2026-100005,85000,Axis Bank,Jaipur,Malviya Nagar,UPI,pending,SYNTHETIC_DEMO
+TXN-2026-0007,NCRP-2026-100006,35000,HDFC Bank,Agra,Shahganj,UPI,cleared,SYNTHETIC_DEMO
+TXN-2026-0008,NCRP-2026-100007,90000,Indian Bank,Patna,Station Road,ATM withdrawal,pending,SYNTHETIC_DEMO
+TXN-2026-0009,NCRP-2026-100008,120000,Canara Bank,Lucknow,Aminabad,UPI,flagged,SYNTHETIC_DEMO
+TXN-2026-0010,NCRP-2026-100009,100000,Jammu & Kashmir Bank,Srinagar,Mehjoor Nagar,ATM withdrawal,flagged,SYNTHETIC_DEMO
+TXN-2026-0011,NCRP-2026-100010,20000,Yes Bank,Delhi,Lajpat Nagar,UPI,cleared,SYNTHETIC_DEMO
+TXN-2026-0012,NCRP-2026-100011,60000,BoB,Muzaffarpur,Railway Road,ATM withdrawal,pending,SYNTHETIC_DEMO
+TXN-2026-0013,NCRP-2026-100012,150000,Axis Bank,Jaipur,Vidyadhar Nagar,UPI,pending,SYNTHETIC_DEMO

@@ -1,0 +1,13 @@
+complaint_id,complainant_name,fraud_type,amount,city,bank,branch,complaint_date,status,synthetic_data_flag,risk_score
+NCRP-2026-100001,Demo Complainant,UPI / payment fraud,185000,Delhi,State Bank of India,Central Branch,2026-09-14,new,SYNTHETIC_DEMO,76
+NCRP-2026-100002,Demo Complainant,Digital-arrest scam,120000,Srinagar,Jammu & Kashmir Bank,Mehjoor Nagar,2026-09-14,investigating,SYNTHETIC_DEMO,91
+NCRP-2026-100003,Demo Complainant,UPI / payment fraud,45000,Delhi,ICICI Bank,Connaught Place,2026-09-14,new,SYNTHETIC_DEMO,52
+NCRP-2026-100004,Demo Complainant,ATM card fraud,70000,Ranchi,State Bank of India,Kotwali Branch,2026-09-14,investigating,SYNTHETIC_DEMO,67
+NCRP-2026-100005,Demo Complainant,Digital-arrest scam,85000,Jaipur,Axis Bank,Malviya Nagar,2026-09-14,new,SYNTHETIC_DEMO,83
+NCRP-2026-100006,Demo Complainant,UPI / payment fraud,35000,Agra,HDFC Bank,Shahganj,2026-09-14,new,SYNTHETIC_DEMO,49
+NCRP-2026-100007,Demo Complainant,ATM card fraud,90000,Patna,Indian Bank,Station Road,2026-09-14,investigating,SYNTHETIC_DEMO,78
+NCRP-2026-100008,Demo Complainant,UPI / payment fraud,120000,Lucknow,Canara Bank,Aminabad,2026-09-14,new,SYNTHETIC_DEMO,74
+NCRP-2026-100009,Demo Complainant,Digital-arrest scam,100000,Mehjoor Nagar,Srinagar,Jammu & Kashmir Bank,2026-09-14,investigating,SYNTHETIC_DEMO,88
+NCRP-2026-100010,Demo Complainant,UPI / payment fraud,20000,Delhi,Yes Bank,Lajpat Nagar,2026-09-14,new,SYNTHETIC_DEMO,35
+NCRP-2026-100011,Demo Complainant,ATM card fraud,60000,Muzaffarpur,BoB,Railway Road,2026-09-14,new,SYNTHETIC_DEMO,63
+NCRP-2026-100012,Demo Complainant,UPI / payment fraud,150000,Jaipur,Axis Bank,Vidyadhar Nagar,2026-09-14,investigating,SYNTHETIC_DEMO,87

@@ -1,0 +1,2 @@
+-- Seed data placeholder for VEYRONIX SQLite first iteration.
+-- This can be expanded with realistic rows after API testing.
