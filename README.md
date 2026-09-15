@@ -1,18 +1,18 @@
-# VERONIX
+# VEYRONIX
 
 ### AI-Powered Cybersecurity Predictive Analytics Platform
 
-VERONIX is a cybersecurity predictive analytics prototype designed to analyze cybercrime complaint and transaction data to identify high-risk patterns, forecast likely cash-withdrawal hotspots, and support faster investigation and response.
+VEYRONIX is a cybersecurity predictive analytics prototype designed to analyze cybercrime complaint and transaction data to identify high-risk patterns, forecast likely cash-withdrawal hotspots, and support faster investigation and response.
 
 ## 🚨 Problem
 
 Cybercrime investigations often involve large volumes of complaint and financial transaction data. Manually analyzing these records can make it difficult to quickly identify patterns, suspicious locations, and time-based trends.
 
-VERONIX aims to assist investigators by transforming historical cybercrime and transaction data into actionable predictive insights.
+VEYRONIX aims to assist investigators by transforming historical cybercrime and transaction data into actionable predictive insights.
 
 ## 💡 Solution
 
-VERONIX combines data processing, predictive analytics, geospatial analysis, and an interactive dashboard to:
+VEYRONIX combines data processing, predictive analytics, geospatial analysis, and an interactive dashboard to:
 
 - Analyze historical cybercrime complaints
 - Identify suspicious transaction patterns
