@@ -9,7 +9,7 @@ VEYRONIX is a cybersecurity analytics prototype designed to analyze cybercrime c
 ## 🚀 Live Demo
 
 **Deployed Project:**
-https://veyronixx.netlify.app/
+https://veyronixx.netlify.app
 
 **GitHub Repository:**
 https://github.com/aryanjain-codes/VEYRONIX
