@@ -21,7 +21,10 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config["JSON_SORT_KEYS"] = False
     app.config["DATABASE"] = str(BASE_DIR / "data" / "veyronix.db")
-    app.config["SECRET_KEY"] = os.environ["VEYRONIX_SECRET_KEY"]
+    app.config["SECRET_KEY"] = os.getenv(
+    "VEYRONIX_SECRET_KEY",
+    "dev-secret-key"
+)
 
     @app.after_request
     def add_cors_headers(response):
