@@ -325,6 +325,13 @@
   .hs-pulse{border-radius:50%;position:absolute;pointer-events:none;animation:mappulse 2.2s ease-out infinite;}
   @keyframes mappulse{0%{transform:scale(.5);opacity:.65;}100%{transform:scale(2.4);opacity:0;}}
 
+  /* ---------- GOOGLE MAP MODES + KEY MODAL ---------- */
+  .mapmodes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0;}
+  .mapmodes button{background:var(--navy-850);color:var(--ink-dim);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:inherit;}
+  .mapmodes button.on{background:var(--teal);color:#04121a;border-color:var(--teal);font-weight:600;}
+  .mapmodes .spacer{flex:1;} .mapmodes label{font-size:11.5px;color:var(--ink-dim);display:flex;gap:5px;align-items:center;}
+  #mapNote{display:none;margin:8px 0;padding:9px 12px;border:1px solid #DDA52A;border-radius:8px;font-size:11.5px;color:var(--ink);background:rgba(221,165,42,.08);line-height:1.5;}
+
   .drawer-overlay{position:fixed;inset:0;background:rgba(3,6,12,.55);z-index:480;opacity:0;pointer-events:none;transition:opacity .2s;}
   .drawer-overlay.on{opacity:1;pointer-events:auto;}
   .drawer{position:fixed;top:0;right:0;height:100vh;width:420px;max-width:92vw;background:var(--navy-900);
@@ -675,6 +682,15 @@
         <div class="rangewrap">Min confidence <input type="range" id="fConf" min="0" max="95" value="0" step="5"><span id="fConfVal" class="mono">0%</span></div>
         <span class="mono" id="resultCount" style="color:var(--ink-dim);font-size:11px;"></span>
       </div>
+      <div id="mapNote"></div>
+      <div class="mapmodes" id="mapModes">
+        <button data-mm="street">🚶 Street View</button>
+        <button data-mm="landscape">🏔️ Landscape view</button>
+        <button data-mm="satellite" class="on">🛰️ Satellite view</button>
+        <button data-mm="tracking">📡 Tracking view</button>
+        <span class="spacer"></span>
+        <label><input type="checkbox" id="heatToggle" checked> Risk heat layer</label>
+      </div>
       <div id="mapCanvas"></div>
       <div class="grid2" style="margin-top:14px;">
         <div class="card">
@@ -730,6 +746,11 @@
         <div class="net-tooltip" id="netTooltip"></div>
       </div>
       <div class="net-legend" id="netLegend"></div>
+      <div class="card" style="margin-top:14px;background:linear-gradient(180deg,#0a1c38,#071226);border:1px solid #2b5a9a;box-shadow:0 0 22px #1f5fd633 inset,0 4px 20px #0006;">
+        <h3 style="margin:0 0 4px;">🛡️ Network vulnerability — live (simulated)</h3>
+        <canvas id="vulG" width="720" height="200" style="width:100%;"></canvas>
+        <div id="vulL" style="display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;margin-top:4px;"></div><div id="vulE" style="font-size:11.5px;color:var(--ink-dim);min-height:16px;margin-top:2px;"></div>
+      </div>
     </div>
 
     <!-- ============ CASES ============ -->
@@ -880,6 +901,16 @@
           <div class="kpi" style="border:none;padding:0;"><div class="n" id="simOut3" style="font-size:28px;">—</div><div class="l">officer-hours required</div></div>
         </div>
       </div>
+      <div class="card" style="margin-top:14px;background:linear-gradient(180deg,#0a1c38,#071226);border:1px solid #2b5a9a;box-shadow:0 0 22px #1f5fd633 inset,0 4px 20px #0006;">
+        <h3 style="margin:0 0 4px;">📈 Live risk index — reacts to your deployment</h3>
+        <div class="sub" style="font-size:11px;color:var(--ink-dim);margin-bottom:6px;">Simulated cash-out pressure for the chosen hotspot. More teams / longer window pulls the baseline down; random cash-out bursts spike it.</div>
+        <canvas id="simG" width="720" height="200" style="width:100%;"></canvas><div id="simGS" style="font-size:11.5px;margin-top:4px;color:var(--ink-dim);"></div>
+      </div>
+      <div class="card" style="margin-top:14px;background:linear-gradient(180deg,#0a1c38,#071226);border:1px solid #2b5a9a;box-shadow:0 0 22px #1f5fd633 inset,0 4px 20px #0006;">
+        <h3 style="margin:0 0 4px;">📊 Daily interception per deployment day — live</h3>
+        <div style="font-size:11px;color:var(--ink-dim);margin-bottom:6px;">Each bar is one day of the deployment window (follows your sliders). Blue-line area = cumulative funds saved. Red-tipped bars are days below 50% interception.</div>
+        <canvas id="simB" width="720" height="220" style="width:100%;"></canvas><div id="simBS" style="font-size:11.5px;margin-top:4px;color:var(--ink-dim);"></div>
+      </div>
     </div>
 
     <!-- ============ INTEGRATION HUB ============ -->
@@ -1015,6 +1046,7 @@
   </footer>
 </div>
 
+
 <!-- ============ HEATMAP DRAWER ============ -->
 <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="hotspotDrawer">
@@ -1044,27 +1076,6 @@ function toast(msg){
   const t = document.createElement('div'); t.className='toast'; t.textContent = msg;
   wrap.appendChild(t);
   setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),300); }, 3600);
-}
-
-/* ---------------- API BRIDGE ---------------- */
-const API_BASE = 'http://127.0.0.1:5000';
-async function apiFetch(path, options={}){
-  const method = (options.method || 'GET').toUpperCase();
-  const payload = options.body || null;
-  const headers = {'Content-Type':'application/json', ...(options.headers||{})};
-  const req = {method, headers};
-  if(payload !== null){ req.body = JSON.stringify(payload); }
-  try {
-    const response = await fetch(API_BASE + path, req);
-    if(!response.ok){
-      const errText = await response.text();
-      throw new Error(errText || `API request failed: ${response.status}`);
-    }
-    return await response.json();
-  }catch(e){
-    console.warn('VEYRONIX API fallback engaged:', e);
-    return null;
-  }
 }
 
 /* ---------------- SEEDED RNG (deterministic demo outputs) ---------------- */
@@ -1149,7 +1160,7 @@ function genMuleAccounts(seed){
   return out;
 }
 
-let hotspots = [
+const hotspots = [
   {id:'h1', name:'Mehjoor Nagar, Srinagar', state:'Jammu & Kashmir', lat:34.1122, lng:74.8320, tier:'crit', risk:91, window:24, cat:'Digital-arrest scam',
    reasons:[['3 new mule accounts opened within 2 km in the last 48 hrs','+22 pts'],['Complaints in this area are 212% higher than usual','+18 pts'],['This week overlaps with a pension-payment date','+9 pts'],['No earlier confirmed fraud case within 5 km','−6 pts']]},
   {id:'h2', name:'Kotwali branch, Ranchi', state:'Jharkhand', lat:23.3629, lng:85.3346, tier:'warn', risk:74, window:48, cat:'UPI / payment fraud',
@@ -1226,7 +1237,7 @@ let auditLog = [
 ];
 
 /* Victim / recovery records, keyed by synthetic complaint id */
-let victimCases = {
+const victimCases = {
   'NCRP-2026-771201': {
     complainant:'A. Sharma (demo)', amount:85000, type:'UPI / payment fraud', filed:'2026-09-05 10:30',
     stage:3, bank:'Canara Bank', branch:'Alambagh, Lucknow', officer:'SI P. Verma', frozen:62000,
@@ -1252,125 +1263,8 @@ const recoverySteps = [
 let currentMode = 'pred';
 let selectedHotspot = hotspots[0];
 let filters = {state:'all', cat:'all', window:48, conf:0};
-let stateNames = [...new Set(hotspots.map(h=>h.state))];
-let catNames = [...new Set(hotspots.map(h=>h.cat))];
-
-async function syncDashboardFromApi(){
-  const stats = await apiFetch('/api/dashboard/stats');
-  if(!stats || !stats.success || !stats.stats) return;
-  const s = stats.stats;
-  const active = document.getElementById('statZones');
-  if(active && Number.isFinite(+s.active_watch_zones)) active.textContent = s.active_watch_zones;
-  const crit = document.getElementById('statCrit');
-  if(crit && Number.isFinite(+s.critical_alerts_today)) crit.textContent = s.critical_alerts_today;
-  const kpiCrit = document.getElementById('kpiCrit');
-  if(kpiCrit && Number.isFinite(+s.critical_alerts_today)) kpiCrit.textContent = s.critical_alerts_today;
-}
-
-async function syncHotspotsFromApi(){
-  const data = await apiFetch('/api/hotspots');
-  if(!data || !data.success || !Array.isArray(data.data) || data.data.length===0) return;
-  const fallback = new Map(hotspots.map(h=>[h.id,h]));
-  hotspots = data.data.map((h,i)=>{
-    const base = fallback.get(h.id) || hotspots[Math.min(i, hotspots.length-1)];
-    return {
-      ...base,
-      id: h.id,
-      name: h.name,
-      state: h.state,
-      lat: h.lat ?? h.latitude ?? base.lat,
-      lng: h.lng ?? h.longitude ?? base.lng,
-      tier: h.tier ?? base.tier,
-      risk: h.risk ?? base.risk,
-      window: h.window ?? h.time_window_hours ?? base.window,
-      cat: h.category ?? h.cat ?? base.cat,
-      reasons: base.reasons || [['Synthetic backend hotspot', '+0 pts']],
-      muleAccounts: base.muleAccounts || [],
-      pastCrimes: base.pastCrimes || [],
-      recovery: base.recovery || {lost:0, frozen:0, cases:0},
-      actions: base.actions || [{when:'—', text:'Hotspot flagged by predictive engine', done:true}],
-    };
-  });
-  selectedHotspot = hotspots[0] || selectedHotspot;
-  stateNames = [...new Set(hotspots.map(h=>h.state))];
-  catNames = [...new Set(hotspots.map(h=>h.cat))];
-  if(window.__prahariMap && typeof renderMap === 'function') renderMap();
-}
-
-async function syncAlertsFromApi(){
-  const data = await apiFetch('/api/alerts');
-  if(!data || !data.success || !Array.isArray(data.data)) return;
-  feedPool.length = 0;
-  data.data.forEach(item=>{
-    feedPool.push({loc:item.location, sev:item.severity, meta:item.message, hotspot:'h1'});
-  });
-}
-
-async function syncCasesFromApi(){
-  const data = await apiFetch('/api/cases');
-  if(!data || !data.success || !Array.isArray(data.data)) return;
-  cases.length = 0;
-  data.data.forEach(row=>{
-    cases.push({
-      id: row.case_id,
-      loc: row.location,
-      sev: row.severity,
-      status: row.status,
-      officer: row.officer || 'Unassigned',
-      opened: row.opened_at || 'just now',
-      hotspot: row.hotspot_id || 'h1',
-    });
-  });
-  if(document.getElementById('view-cases').classList.contains('on')) renderCases();
-}
-
-async function syncAuditFromApi(){
-  const data = await apiFetch('/api/audit/logs');
-  if(!data || !data.success || !Array.isArray(data.data)) return;
-  auditLog.length = 0;
-  data.data.forEach(row=>{
-    auditLog.push({
-      user: row.user,
-      role: row.role,
-      action: row.action,
-      target: row.target,
-      time: (row.created_at || row.time || new Date().toLocaleTimeString('en-IN',{hour12:false})).slice(11, 19),
-    });
-  });
-  renderAudit(document.getElementById('auditSearch')?.value || '');
-}
-
-async function syncComplaintsFromApi(){
-  const data = await apiFetch('/api/complaints');
-  if(!data || !data.success || !Array.isArray(data.data)) return;
-  const complaintList = data.data.map(row=>({
-    id: row.complaint_id,
-    complainant: row.complainant_name || 'Demo Complainant',
-    type: row.fraud_type,
-    amount: row.amount,
-    filed: row.complaint_date || new Date().toISOString().slice(0,10),
-    stage: 1,
-    bank: row.bank,
-    branch: row.branch,
-    officer: 'I4C Analyst',
-    frozen: row.amount || 0,
-  }));
-
-  if(Array.isArray(complaintList) && complaintList.length>0){
-    victimCases = {};
-    complaintList.forEach(c=>{ victimCases[c.id] = c; });
-    populateVictimSelect();
-  }
-}
-
-async function syncApiData(){
-  await syncDashboardFromApi();
-  await syncHotspotsFromApi();
-  await syncAlertsFromApi();
-  await syncCasesFromApi();
-  await syncAuditFromApi();
-  await syncComplaintsFromApi();
-}
+const stateNames = [...new Set(hotspots.map(h=>h.state))];
+const catNames = [...new Set(hotspots.map(h=>h.cat))];
 
 /* =========================== AUTH =========================== */
 let currentUser = null;
@@ -1390,29 +1284,16 @@ document.getElementById('suRoleGrid').addEventListener('click', e=>{
   document.getElementById('suOrgField').classList.toggle('hidden', suSelectedRole==='victim');
 });
 
-async function doLogin(){
+function doLogin(){
   const email = document.getElementById('loginEmail').value.trim();
   const pass = document.getElementById('loginPass').value;
   const err = document.getElementById('loginErr');
   if(!email || !pass){ err.textContent = 'Enter an email/ID and password to continue.'; return; }
   err.textContent = '';
-
   let role = 'admin';
   if(/bank|fi\./i.test(email)) role = 'bank';
   else if(/police|lea|kaul|toppo/i.test(email)) role = 'lea';
   else if(/victim|citizen/i.test(email)) role = 'victim';
-
-  const apiResp = await apiFetch('/api/auth/login', {
-    method: 'POST',
-    body: {email, password: pass, role},
-  });
-
-  if(apiResp && apiResp.success && apiResp.user){
-    const user = apiResp.user;
-    loginAs({name: user.name || user.email.split('@')[0], role: user.role || role, org: user.organization || (role==='bank' ? 'Partner bank' : 'I4C')});
-    return;
-  }
-
   const name = email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
   loginAs({name: name || 'Demo User', role, org: role==='bank' ? 'Partner bank' : 'I4C'});
 }
@@ -1420,7 +1301,7 @@ function quickLogin(role){
   const names = {admin:'Utkarsh Kumar', lea:'Insp. R. Kaul', bank:'SBI Nodal Officer', victim:'A. Sharma'};
   loginAs({name:names[role], role, org: role==='bank' ? 'State Bank of India' : 'I4C / CIS Division'});
 }
-async function doSignup(){
+function doSignup(){
   const name = document.getElementById('suName').value.trim();
   const email = document.getElementById('suEmail').value.trim();
   const pass = document.getElementById('suPass').value;
@@ -1430,21 +1311,9 @@ async function doSignup(){
   if(!/^\S+@\S+\.\S+$/.test(email)){ err.textContent='Enter a valid email address.'; return; }
   if(!terms){ err.textContent='Please accept the data-use note to continue.'; return; }
   err.textContent='';
-
   const org = document.getElementById('suOrg').value.trim();
-  const apiResp = await apiFetch('/api/auth/signup', {
-    method: 'POST',
-    body: {name, email, password: pass, role: suSelectedRole, organization: org || (suSelectedRole==='victim' ? 'Citizen' : 'Partner organisation')},
-  });
-
-  if(apiResp && apiResp.success){
-    loginAs({name, role:suSelectedRole, org: org || (suSelectedRole==='victim' ? 'Citizen' : 'Partner organisation')});
-    toast('Account created for this demo session — welcome, '+name.split(' ')[0]+'.');
-    return;
-  }
-
-  if(apiResp && apiResp.message) err.textContent = apiResp.message;
   loginAs({name, role:suSelectedRole, org: org || (suSelectedRole==='victim' ? 'Citizen' : 'Partner organisation')});
+  toast('Account created for this demo session — welcome, '+name.split(' ')[0]+'.');
 }
 function loginAs(user){
   currentUser = user;
@@ -1500,7 +1369,7 @@ function goto(view){
     if(view==='heatmap') initHeatmap();
     if(view==='network') initNetwork();
   }
-  if(view==='heatmap') setTimeout(()=>{ if(window.__prahariMap) window.__prahariMap.invalidateSize(); }, 60);
+  if(view==='heatmap') setTimeout(()=>{ if(window.__prahariMap) window.__prahariMap.invalidateSize(); if(window.__gmap) google.maps.event.trigger(window.__gmap,'resize'); }, 60);
 }
 
 /* =========================== AUDIT LOG =========================== */
@@ -1542,8 +1411,181 @@ function renderOverview(){
 }
 renderOverview();
 
-/* =========================== HEATMAP (Leaflet) =========================== */
-let hotspotLayer, historicalLayer, mapLegendEl;
+
+/* =========================== API KEYS =========================== */
+/* Paste keys here, or use the 🔑 API keys button on the map (saved in this browser). */
+const VEYRONIX_API_KEYS = {
+  GOOGLE_MAPS_API_KEY: 'AIzaSyBRo4r5DQEgvKUfXVY0L6NENltI7mCoykM',   // Maps JavaScript API — powers Street View, Satellite (hybrid), Terrain, Tracking
+  GOOGLE_MAP_ID: '',         // optional cloud-styled Map ID
+  TRACKING_FEED_URL: '',     // optional live feed: JSON [{id,lat,lng,label}] — simulated feed is used if empty
+};
+function apiKey(n){ let s=null; try{ s=JSON.parse(localStorage.getItem('veyronix_api_keys')||'null'); }catch(e){} return (s&&s[n])||VEYRONIX_API_KEYS[n]||''; }
+
+/* =========================== GOOGLE MAP (Street / Landscape / Satellite / Tracking + risk heat) =========================== */
+let gmap, gPano, gMarkers=[], heatOv, gMode='satellite', gLastSel=null, gTrack={u:{},timer:null};
+const GM_DARK=[{elementType:'geometry',stylers:[{color:'#0f1b2d'}]},{elementType:'labels.text.fill',stylers:[{color:'#8aa0bd'}]},{elementType:'labels.text.stroke',stylers:[{color:'#0a1220'}]},{featureType:'road',elementType:'geometry',stylers:[{color:'#25384f'}]},{featureType:'water',elementType:'geometry',stylers:[{color:'#08111d'}]},{featureType:'poi',stylers:[{visibility:'off'}]}];
+function mapNote(msg,err){ const n=document.getElementById('mapNote'); n.style.display=msg?'block':'none'; n.textContent=msg||''; if(err) n.style.borderColor='#E1594F'; }
+function renderMap(){ return window.__gmap ? renderMapGoogle() : renderMapLeaflet(); }
+
+function initHeatmap(){
+  wireMapUI();
+  if(apiKey('GOOGLE_MAPS_API_KEY')) startGoogleMap(); else fallbackLeaflet('');
+}
+function fallbackLeaflet(msg){
+  mapNote(msg); document.querySelectorAll('#mapModes [data-mm]').forEach(b=>b.classList.toggle('on',b.dataset.mm===lMode));
+  if(window.__prahariMap) return; window.__filtersWired=true; initHeatmapLeaflet();
+}
+function wireFilters(){
+  window.__filtersWired=true; populateHeatmapSelects();
+  document.getElementById('modeToggle').addEventListener('click', e=>{ const s=e.target.closest('span'); if(!s) return; currentMode=s.dataset.mode; document.querySelectorAll('#modeToggle span').forEach(x=>x.classList.toggle('on',x===s)); renderMap(); });
+  document.getElementById('fState').addEventListener('change', e=>{filters.state=e.target.value; renderMap();});
+  document.getElementById('fCat').addEventListener('change', e=>{filters.cat=e.target.value; renderMap();});
+  document.getElementById('fWindow').addEventListener('change', e=>{filters.window=+e.target.value; renderMap();});
+  document.getElementById('fConf').addEventListener('input', e=>{filters.conf=+e.target.value; document.getElementById('fConfVal').textContent=e.target.value+'%'; renderMap();});
+}
+function wireMapUI(){
+  document.getElementById('mapModes').addEventListener('click', e=>{ const b=e.target.closest('[data-mm]'); if(b) setMapMode(b.dataset.mm); });
+  document.getElementById('heatToggle').onchange=()=>renderMap();
+}
+function loadGoogleMaps(key){
+  return new Promise((res,rej)=>{
+    if(window.google&&google.maps) return res();
+    window.__gmReady=res; window.gm_authFailure=()=>mapNote('Google rejected this API key — check that Maps JavaScript API is enabled, billing is on, and the HTTP-referrer restriction allows this page.',true);
+    const s=document.createElement('script'); s.async=true; s.onerror=()=>rej(new Error('Google Maps script failed to load'));
+    s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&v=weekly&callback=__gmReady'; document.head.appendChild(s);
+  });
+}
+async function startGoogleMap(){
+  try{ await loadGoogleMaps(apiKey('GOOGLE_MAPS_API_KEY')); }catch(e){ return fallbackLeaflet('Could not reach Google Maps ('+e.message+'). Showing the fallback map.'); }
+  if(!window.__filtersWired) wireFilters();
+  mapNote(''); const el=document.getElementById('mapCanvas'); el.innerHTML='';
+  const o={center:{lat:22.9,lng:79.5},zoom:5,minZoom:4,mapTypeId:'hybrid',streetViewControl:false,mapTypeControl:false,fullscreenControl:true,gestureHandling:'greedy'};
+  if(apiKey('GOOGLE_MAP_ID')) o.mapId=apiKey('GOOGLE_MAP_ID');
+  gmap=window.__gmap=new google.maps.Map(el,o); gPano=gmap.getStreetView();
+  gPano.addListener('visible_changed',()=>{ if(!gPano.getVisible()&&gMode==='street') setMapMode('satellite'); });
+  const lg=document.createElement('div'); lg.id='mapLegendInner'; lg.className='map-legend'; lg.style.cssText='position:static;margin:0 0 12px 12px;'; gmap.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(lg);
+  heatOv=makeHeatOverlay(); heatOv.setMap(gmap); gmap.addListener('idle',()=>heatOv.draw());
+  gLastSel=selectedHotspot.id; document.querySelectorAll('#mapModes [data-mm]').forEach(b=>b.classList.toggle('on',b.dataset.mm==='satellite')); gMode='satellite';
+  renderMapGoogle(); renderWhy(); renderQuickSim();
+}
+
+/* Custom canvas heat layer (independent of Google's deprecated HeatmapLayer) */
+function makeHeatOverlay(){
+  class Heat extends google.maps.OverlayView{
+    constructor(){ super(); this.pts=[]; this.cv=document.createElement('canvas'); this.cv.style.cssText='position:absolute;pointer-events:none;opacity:.85;'; this.pal=Heat.palette(); }
+    static palette(){ const c=document.createElement('canvas'); c.width=1; c.height=256; const x=c.getContext('2d'), g=x.createLinearGradient(0,0,0,256);
+      g.addColorStop(0,'rgba(51,183,170,0)'); g.addColorStop(.25,'rgba(51,183,170,.7)'); g.addColorStop(.5,'rgba(221,165,42,.9)'); g.addColorStop(.75,'rgba(225,89,79,.95)'); g.addColorStop(1,'rgba(255,240,220,1)');
+      x.fillStyle=g; x.fillRect(0,0,1,256); return x.getImageData(0,0,1,256).data; }
+    onAdd(){ this.getPanes().overlayLayer.appendChild(this.cv); }
+    onRemove(){ this.cv.remove(); }
+    draw(){
+      const map=this.getMap(), pr=this.getProjection(), b=map&&map.getBounds(); if(!pr||!b) return;
+      const sw=pr.fromLatLngToDivPixel(b.getSouthWest()), ne=pr.fromLatLngToDivPixel(b.getNorthEast());
+      const x0=Math.min(sw.x,ne.x), y0=Math.min(sw.y,ne.y), w=Math.max(1,Math.round(Math.abs(ne.x-sw.x))), h=Math.max(1,Math.round(Math.abs(sw.y-ne.y)));
+      const cv=this.cv; cv.style.left=x0+'px'; cv.style.top=y0+'px'; cv.width=w; cv.height=h;
+      const ctx=cv.getContext('2d'); ctx.clearRect(0,0,w,h); const r=Math.max(30,24*Math.pow(2,(map.getZoom()-5)*.85));
+      for(const p of this.pts){ const q=pr.fromLatLngToDivPixel(new google.maps.LatLng(p.lat,p.lng)), x=q.x-x0, y=q.y-y0, g=ctx.createRadialGradient(x,y,0,x,y,r);
+        g.addColorStop(0,'rgba(0,0,0,'+Math.min(1,p.w)+')'); g.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=g; ctx.fillRect(x-r,y-r,2*r,2*r); }
+      const img=ctx.getImageData(0,0,w,h), d=img.data, pal=this.pal;
+      for(let i=0;i<d.length;i+=4){ const a=d[i+3]; if(!a) continue; const j=a*4; d[i]=pal[j]; d[i+1]=pal[j+1]; d[i+2]=pal[j+2]; d[i+3]=pal[j+3]; }
+      ctx.putImageData(img,0,0);
+    }
+  }
+  return new Heat();
+}
+
+function renderMapGoogle(){
+  gMarkers.forEach(m=>m.setMap(null)); gMarkers=[]; const legend=document.getElementById('mapLegendInner'), pts=[];
+  const dot=(c,s,sel)=>({path:google.maps.SymbolPath.CIRCLE,scale:s,fillColor:c,fillOpacity:.95,strokeColor:'#fff',strokeWeight:sel?3:1});
+  if(currentMode==='hist'){
+    historical.forEach(p=>{ gMarkers.push(new google.maps.Marker({position:{lat:p.lat,lng:p.lng},map:gmap,title:p.name+' · past incident (Pratibimb-style)',icon:dot('#5384DA',6)})); pts.push({lat:p.lat,lng:p.lng,w:.5}); });
+    if(legend) legend.innerHTML='<span><b style="background:#5384DA;"></b>Past incident (Pratibimb-style)</span>';
+    document.getElementById('resultCount').textContent=historical.length+' past incident points shown';
+  } else {
+    const list=hotspots.filter(h=>(filters.state==='all'||h.state===filters.state)&&(filters.cat==='all'||h.cat===filters.cat)&&h.window<=filters.window&&h.risk>=filters.conf);
+    list.forEach(h=>{ const c=h.tier==='crit'?'#E1594F':h.tier==='warn'?'#DDA52A':'#33B7AA', sel=selectedHotspot&&h.id===selectedHotspot.id;
+      const m=new google.maps.Marker({position:{lat:h.lat,lng:h.lng},map:gmap,title:h.name+' · '+h.risk+'%',icon:dot(c,h.tier==='crit'?9:h.tier==='warn'?7.5:6,sel),zIndex:sel?9:1});
+      m.addListener('click',()=>openHotspotById(h.id)); gMarkers.push(m); pts.push({lat:h.lat,lng:h.lng,w:h.risk/100}); });
+    if(legend) legend.innerHTML=list.length?'<span><b style="background:#E1594F;"></b>Critical (&gt;85%)</span><span><b style="background:#DDA52A;"></b>Elevated (55–85%)</span><span><b style="background:#33B7AA;"></b>Watch (&lt;55%)</span>':'<span>No hotspots match these filters — widen the confidence range or window.</span>';
+    document.getElementById('resultCount').textContent=list.length+' of '+hotspots.length+' hotspots shown';
+  }
+  heatOv.pts=document.getElementById('heatToggle').checked?pts:[]; heatOv.draw();
+  if(selectedHotspot&&gLastSel!==selectedHotspot.id){ gLastSel=selectedHotspot.id;
+    if(gMode==='street') showStreet(selectedHotspot);
+    else if(gMode==='tracking'){ stopTracking(); startTracking(); }
+    else { gmap.panTo({lat:selectedHotspot.lat,lng:selectedHotspot.lng}); if(gmap.getZoom()<12) gmap.setZoom(13); } }
+}
+
+function setMapMode(m){
+  if(!window.__gmap) return setMapModeLeaflet(m);
+  gMode=m; document.querySelectorAll('#mapModes [data-mm]').forEach(b=>b.classList.toggle('on',b.dataset.mm===m));
+  stopTracking(); gPano.setVisible(false); gmap.setOptions({styles:m==='tracking'?GM_DARK:null});
+  if(m==='landscape'){ gmap.setMapTypeId('terrain'); }
+  else if(m==='satellite'){ gmap.setMapTypeId('hybrid'); }
+  else if(m==='tracking'){ gmap.setMapTypeId('roadmap'); startTracking(); }
+  else if(m==='street'){ showStreet(selectedHotspot); }
+}
+function showStreet(h){
+  new google.maps.StreetViewService().getPanorama({location:{lat:h.lat,lng:h.lng},radius:500,source:google.maps.StreetViewSource.OUTDOOR},(data,status)=>{
+    if(status==='OK'){ gPano.setPano(data.location.pano); gPano.setPov({heading:0,pitch:0}); gPano.setVisible(true); }
+    else { toast('No Street View coverage within 500 m of '+h.name+' — switched to satellite'); gMode='satellite'; document.querySelectorAll('#mapModes [data-mm]').forEach(b=>b.classList.toggle('on',b.dataset.mm==='satellite')); gmap.setMapTypeId('hybrid'); gmap.panTo({lat:h.lat,lng:h.lng}); gmap.setZoom(15); }
+  });
+}
+
+/* Tracking: live feed if TRACKING_FEED_URL is set, otherwise a clearly-synthetic cash-out cell + response team */
+const M2DEG=1/111320;
+function putUnit(id,lat,lng,label,color){
+  let u=gTrack.u[id];
+  if(!u){ u={path:[],m:new google.maps.Marker({map:gmap,icon:{path:google.maps.SymbolPath.FORWARD_CLOSED_ARROW,scale:6,fillColor:color,fillOpacity:1,strokeColor:'#fff',strokeWeight:1.5},zIndex:20}),l:new google.maps.Polyline({map:gmap,strokeColor:color,strokeOpacity:.85,strokeWeight:3})}; gTrack.u[id]=u; }
+  u.path.push({lat,lng}); if(u.path.length>60) u.path.shift(); u.m.setPosition({lat,lng}); u.m.setTitle(label); u.l.setPath(u.path);
+}
+function startTracking(){
+  const h=selectedHotspot, feed=apiKey('TRACKING_FEED_URL'), kx=Math.cos(h.lat*Math.PI/180); gmap.panTo({lat:h.lat,lng:h.lng}); gmap.setZoom(14); gTrack.u={};
+  let mule={lat:h.lat,lng:h.lng,b:Math.random()*6.28}, team={lat:h.lat+.012,lng:h.lng-.012}; const lg=()=>document.getElementById('mapLegendInner');
+  const tick=async()=>{
+    if(feed){ try{ (await (await fetch(feed)).json()).forEach(o=>putUnit(o.id,o.lat,o.lng,o.label||o.id,'#33B7AA')); lg().innerHTML='<span><b style="background:#33B7AA;"></b>Live feed · '+Object.keys(gTrack.u).length+' units</span>'; }catch(e){ mapNote('Tracking feed unreachable: '+e.message,true); } return; }
+    mule.b+=(Math.random()-.5)*.8; mule.lat+=Math.cos(mule.b)*90*M2DEG; mule.lng+=Math.sin(mule.b)*90*M2DEG/kx;
+    const dy=mule.lat-team.lat, dx=(mule.lng-team.lng)*kx, d=Math.hypot(dx,dy)/M2DEG, s=Math.min(d,130);
+    if(d>1){ team.lat+=dy/d*s*M2DEG*(1/1); team.lng+=dx/d*s*M2DEG/kx; }
+    putUnit('mule',mule.lat,mule.lng,'Suspected cash-out cell (simulated)','#E1594F'); putUnit('team',team.lat,team.lng,'Response team (simulated)','#33B7AA'); gmap.panTo({lat:mule.lat,lng:mule.lng});
+    lg().innerHTML='<span><b style="background:#E1594F;"></b>Cash-out cell (simulated)</span><span><b style="background:#33B7AA;"></b>Response team · '+(d<60?'intercepting':Math.round(d)+' m behind')+'</span>';
+  };
+  tick(); gTrack.timer=setInterval(tick,feed?3000:1000);
+}
+function stopTracking(){ clearInterval(gTrack.timer); gTrack.timer=null; Object.values(gTrack.u).forEach(u=>{u.m.setMap(null);u.l.setMap(null);}); gTrack.u={}; renderMapGoogleLegendOnly(); }
+function renderMapGoogleLegendOnly(){ if(window.__gmap && gMode!=='tracking') renderMapGoogle(); }
+
+/* =========================== HEATMAP (Leaflet fallback) =========================== */
+let hotspotLayer, historicalLayer, mapLegendEl, lBase={}, lMode='', lTrack={t:null,l:null,u:{}};
+function lStopTrack(){ clearInterval(lTrack.t); lTrack.t=null; Object.values(lTrack.u).forEach(u=>{ if(window.__prahariMap){ window.__prahariMap.removeLayer(u.m); window.__prahariMap.removeLayer(u.l); } }); lTrack.u={}; }
+function lPutUnit(id,lat,lng,label,color){
+  const map=window.__prahariMap; let u=lTrack.u[id];
+  if(!u){ u={path:[],m:L.circleMarker([lat,lng],{radius:7,color:'#fff',weight:1.5,fillColor:color,fillOpacity:1}).addTo(map),l:L.polyline([],{color:color,weight:3,opacity:.85}).addTo(map)}; lTrack.u[id]=u; }
+  u.path.push([lat,lng]); if(u.path.length>60) u.path.shift(); u.m.setLatLng([lat,lng]).bindTooltip(label); u.l.setLatLngs(u.path);
+}
+function lStartTrack(){
+  const map=window.__prahariMap, h=selectedHotspot, feed=apiKey('TRACKING_FEED_URL'), kx=Math.cos(h.lat*Math.PI/180);
+  map.setView([h.lat,h.lng],14); lTrack.u={};
+  let mule={lat:h.lat,lng:h.lng,b:Math.random()*6.28}, team={lat:h.lat+.012,lng:h.lng-.012}; const lg=()=>document.getElementById('mapLegendInner');
+  const tick=async()=>{
+    if(feed){ try{ (await (await fetch(feed)).json()).forEach(o=>lPutUnit(o.id,o.lat,o.lng,o.label||o.id,'#33B7AA')); lg().innerHTML='<span><b style="background:#33B7AA;"></b>Live feed · '+Object.keys(lTrack.u).length+' units</span>'; }catch(e){ mapNote('Tracking feed unreachable: '+e.message,true); } return; }
+    mule.b+=(Math.random()-.5)*.8; mule.lat+=Math.cos(mule.b)*90*M2DEG; mule.lng+=Math.sin(mule.b)*90*M2DEG/kx;
+    const dy=mule.lat-team.lat, dx=(mule.lng-team.lng)*kx, d=Math.hypot(dx,dy)/M2DEG, sp=Math.min(d,130);
+    if(d>1){ team.lat+=dy/d*sp*M2DEG; team.lng+=dx/d*sp*M2DEG/kx; }
+    lPutUnit('mule',mule.lat,mule.lng,'Suspected cash-out cell (simulated)','#E1594F'); lPutUnit('team',team.lat,team.lng,'Response team (simulated)','#33B7AA'); map.panTo([mule.lat,mule.lng]);
+    lg().innerHTML='<span><b style="background:#E1594F;"></b>Cash-out cell (simulated)</span><span><b style="background:#33B7AA;"></b>Response team · '+(d<60?'intercepting':Math.round(d)+' m behind')+'</span>';
+  };
+  tick(); lTrack.t=setInterval(tick,feed?3000:1000);
+}
+function setMapModeLeaflet(m){
+  const map=window.__prahariMap; if(!map) return;
+  if(m==='street'){ const h=selectedHotspot; window.open('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint='+h.lat+','+h.lng,'_blank','noopener'); toast('Street View opened in a new tab (in-app Street View needs a Google key)'); return; }
+  lStopTrack(); Object.values(lBase).forEach(l=>map.removeLayer(l));
+  const base=m==='satellite'?'satellite':m==='landscape'?'landscape':'dark'; lBase[base].addTo(map);
+  lMode=m; document.querySelectorAll('#mapModes [data-mm]').forEach(b=>b.classList.toggle('on',b.dataset.mm===m));
+  if(m==='tracking') lStartTrack(); else { map.panTo([selectedHotspot.lat,selectedHotspot.lng]); renderMapLeaflet(); }
+}
+
 function populateHeatmapSelects(){
   const fS = document.getElementById('fState'); fS.innerHTML = '<option value="all">All states</option>' + stateNames.map(s=>`<option>${s}</option>`).join('');
   const fC = document.getElementById('fCat'); fC.innerHTML = '<option value="all">All categories</option>' + catNames.map(c=>`<option>${c}</option>`).join('');
@@ -1558,13 +1600,17 @@ function hotspotIcon(h, selected){
       <div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};box-shadow:0 0 10px ${color};${selected?'outline:2px solid #fff;outline-offset:2px;':''}"></div>
     </div>` });
 }
-function initHeatmap(){
+function initHeatmapLeaflet(){
   populateHeatmapSelects();
-  const map = L.map('mapCanvas', {zoomControl:true, minZoom:4, maxZoom:12}).setView([22.9,79.5], 5);
+  const map = L.map('mapCanvas', {zoomControl:true, minZoom:4, maxZoom:18}).setView([22.9,79.5], 5);
   window.__prahariMap = map;
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png', {
-    attribution:'&copy; OpenStreetMap contributors &copy; CARTO', subdomains:'abcd', maxZoom:19,
-  }).addTo(map);
+  lBase={
+    dark:L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap contributors &copy; CARTO',subdomains:'abcd',maxZoom:19}),
+    satellite:L.layerGroup([L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Imagery &copy; Esri, Maxar, Earthstar Geographics',maxZoom:18}),
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{maxZoom:18})]),
+    landscape:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles &copy; Esri',maxZoom:18})
+  };
+  lBase.dark.addTo(map);
   hotspotLayer = L.layerGroup().addTo(map);
   historicalLayer = L.layerGroup();
   mapLegendEl = L.control({position:'bottomleft'});
@@ -1584,7 +1630,8 @@ function initHeatmap(){
 
   renderMap(); renderWhy(); renderQuickSim();
 }
-function renderMap(){
+function renderMapLeaflet(){
+  if(lMode==='tracking' && lTrack.t) return;
   hotspotLayer.clearLayers(); historicalLayer.clearLayers();
   const legend = document.getElementById('mapLegendInner');
   if(currentMode==='hist'){
@@ -2175,7 +2222,7 @@ const fraudBaseRate = {
   'Courier / parcel scam':33, 'Loan-app harassment':30, 'Job / task scam':28,
 };
 let lastPrediction = null;
-async function runJudgeDemo(){
+function runJudgeDemo(){
   const type = document.getElementById('jdType').value;
   const amount = +document.getElementById('jdAmount').value || 0;
   const cityName = document.getElementById('jdCity').value;
@@ -2185,32 +2232,32 @@ async function runJudgeDemo(){
   const city = cities.find(c=>c.name===cityName) || cities[0];
   const seed = [type,amount,cityName,bank,date,time].join('|');
 
-  const fallbackFactors = [];
+  const factors = [];
   let score = fraudBaseRate[type] || 32;
-  fallbackFactors.push([`Base rate for "${type}" complaints`, '+'+(fraudBaseRate[type]||32)+' pts']);
+  factors.push([`Base rate for "${type}" complaints`, '+'+(fraudBaseRate[type]||32)+' pts']);
 
   let amtPts = amount>200000?14:amount>50000?9:amount>10000?4:1;
-  score += amtPts; fallbackFactors.push([`Amount reported (${fmtRs(amount)})`, '+'+amtPts+' pts']);
+  score += amtPts; factors.push([`Amount reported (${fmtRs(amount)})`, '+'+amtPts+' pts']);
 
   const hour = +time.split(':')[0];
   const inCashoutWindow = hour>=10 && hour<=15;
   const timePts = inCashoutWindow ? 9 : 3;
-  score += timePts; fallbackFactors.push([inCashoutWindow ? 'Complaint time overlaps the 12–3 PM cash-out window seen in past cases' : 'Complaint time outside the typical cash-out window', '+'+timePts+' pts']);
+  score += timePts; factors.push([inCashoutWindow ? 'Complaint time overlaps the 12–3 PM cash-out window seen in past cases' : 'Complaint time outside the typical cash-out window', '+'+timePts+' pts']);
 
   const dom = new Date(date+'T00:00:00').getDate();
   const payday = dom>=25 || dom<=5;
   const paydayPts = payday ? 9 : 0;
-  if(payday){ score += paydayPts; fallbackFactors.push(['This period overlaps a payday / pension-payment window', '+'+paydayPts+' pts']); }
+  if(payday){ score += paydayPts; factors.push(['This period overlaps a payday / pension-payment window', '+'+paydayPts+' pts']); }
   const festival = (dom % 7 === 0);
-  if(festival){ score += 7; fallbackFactors.push(['Date overlaps a flagged festival-spend period', '+7 pts']); }
+  if(festival){ score += 7; factors.push(['Date overlaps a flagged festival-spend period', '+7 pts']); }
 
   const muleCount = 2 + Math.floor(seededRand(seed+'mc')*6);
   const clusterPts = Math.min(24, muleCount*4);
-  score += clusterPts; fallbackFactors.push([`${muleCount} mule accounts opened within 2 km in the last 48 hrs (synthetic)`, '+'+clusterPts+' pts']);
+  score += clusterPts; factors.push([`${muleCount} mule accounts opened within 2 km in the last 48 hrs (synthetic)`, '+'+clusterPts+' pts']);
 
   const hasHistory = seededRand(seed+'hist') > 0.4;
-  if(hasHistory){ const p = 5+Math.floor(seededRand(seed+'hp')*10); score += p; fallbackFactors.push(['Confirmed prior cash-out within 5 km of this branch', '+'+p+' pts']); }
-  else { score -= 6; fallbackFactors.push(['No earlier confirmed fraud case within 5 km', '−6 pts']); }
+  if(hasHistory){ const p = 5+Math.floor(seededRand(seed+'hp')*10); score += p; factors.push(['Confirmed prior cash-out within 5 km of this branch', '+'+p+' pts']); }
+  else { score -= 6; factors.push(['No earlier confirmed fraud case within 5 km', '−6 pts']); }
 
   score = Math.max(6, Math.min(97, Math.round(score)));
   const tier = score>85?'crit':score>=55?'warn':'watch';
@@ -2222,62 +2269,21 @@ async function runJudgeDemo(){
   const windowLabel = windows[Math.floor(seededRand(seed+'win')*windows.length)];
   const daysOut = 1 + Math.floor(seededRand(seed+'d')*3);
 
-  const apiPayload = {
-    complaint_id: `NCRP-SYNTHETIC-${Date.now()}`,
-    fraud_type: type,
-    amount,
-    city: cityName,
-    bank,
-    branch: locationLabel,
-    transaction_count: 2,
-    total_transaction_amount: amount || 50000,
-    max_transaction_amount: amount || 50000,
-  };
-
-  const apiResult = await apiFetch('/api/predictions', {method: 'POST', body: apiPayload});
-  if(apiResult && apiResult.success){
-    const responseTier = apiResult.priority === 'CRITICAL' ? 'crit' : apiResult.priority === 'HIGH' ? 'warn' : 'watch';
-    lastPrediction = {
-      type,
-      amount,
-      cityName,
-      bank,
-      date,
-      time,
-      score: apiResult.risk_score,
-      tier: responseTier,
-      factors: apiResult.explanation.map((e, idx)=>[`${e}`, idx % 2 ? '+4 pts' : '+8 pts']),
-      atmNum: 100 + Math.floor(seededRand(seed+'atm')*400),
-      locationLabel: apiResult.predicted_location || locationLabel,
-      windowLabel: apiResult.time_window || windowLabel,
-      daysOut: 1 + Math.floor(seededRand(seed+'d')*3),
-      muleCount: muleCount,
-    };
-    renderJudgeDemoOutput();
-    logAudit(currentUser.name.replace(/\s+/g,'.').toLowerCase(), roleLabels[currentUser.role], 'Ran live predictor', `${type} · ${cityName} · ${fmtRs(amount)}`);
-    return;
-  }
-
-  lastPrediction = {type, amount, cityName, bank, date, time, score, tier, factors:fallbackFactors, atmNum, locationLabel, windowLabel, daysOut, muleCount};
+  lastPrediction = {type, amount, cityName, bank, date, time, score, tier, factors, atmNum, locationLabel, windowLabel, daysOut, muleCount};
   renderJudgeDemoOutput();
   logAudit(currentUser.name.replace(/\s+/g,'.').toLowerCase(), roleLabels[currentUser.role], 'Ran live predictor', `${type} · ${cityName} · ${fmtRs(amount)}`);
 }
 function renderJudgeDemoOutput(){
   const p = lastPrediction;
   const color = p.tier==='crit'?'var(--red)':p.tier==='warn'?'var(--amber)':'var(--teal)';
-  const tierLabel = p.tier==='crit'?'critical':p.tier==='warn'?'elevated':'watch';
   document.getElementById('jdOutput').innerHTML = `
     <div class="demo-result">
       <div class="gauge-wrap">
         <div class="gauge-num" style="color:${color};">${p.score}%</div>
-        <div class="gauge-lbl">predicted risk — ${tierLabel}</div>
+        <div class="gauge-lbl">predicted risk — ${p.tier==='crit'?'critical':p.tier==='warn'?'elevated':'watch'}</div>
       </div>
-      <div class="kv"><span>Risk score</span><b>${p.score}%</b></div>
-      <div class="kv"><span>Predicted location</span><b>${p.locationLabel}</b></div>
-      <div class="kv"><span>Time window</span><b>${p.windowLabel}${p.daysOut ? ', +'+p.daysOut+' day'+(p.daysOut>1?'s':'') : ''}</b></div>
-      <div class="kv"><span>Confidence</span><b>${typeof p.confidence === 'number' ? p.confidence.toFixed(2) : (p.confidence || '—')}</b></div>
-      <div class="kv"><span>Priority</span><b>${p.priority || tierLabel.toUpperCase()}</b></div>
       <div class="kv"><span>Most likely cash-out point</span><b>ATM-${p.atmNum}, ${p.locationLabel}</b></div>
+      <div class="kv"><span>Predicted time window</span><b>${p.windowLabel}, +${p.daysOut} day${p.daysOut>1?'s':''}</b></div>
       <div class="kv"><span>Mule accounts in cluster</span><b>${p.muleCount}</b></div>
       <h4 style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-faint);margin:16px 0 8px;">Why this score (SHAP-style)</h4>
       ${p.factors.map(f=>`<div class="kv"><span>${f[0]}</span><b>${f[1]}</b></div>`).join('')}
@@ -2750,6 +2756,91 @@ renderBiasTable();
 initSimTab();
 renderBenchHistory();
 
+</script>
+<script>
+/* ===== VEYRONIX add-on: live mule-network graph + ATM layer (no API key needed) ===== */
+(function(){
+  /* ATM layer via OpenStreetMap Overpass */
+  const bar=document.getElementById('mapModes'); if(!bar) return;
+  const b=document.createElement('button'); b.textContent='🏧 ATMs'; bar.appendChild(b);
+  let on=false,items=[],lastId=null;
+  const clear=()=>{items.forEach(m=>m.setMap?m.setMap(null):m.remove());items=[];};
+  async function load(){
+    const h=selectedHotspot; if(!h) return; lastId=h.id; clear();
+    try{
+      const q='[out:json][timeout:20];node["amenity"="atm"](around:3000,'+h.lat+','+h.lng+');out 80;';
+      const r=await (await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)})).json();
+      r.elements.forEach(e=>{const t=(e.tags&&(e.tags.name||e.tags.operator||e.tags.brand))||'ATM';
+        if(window.__gmap) items.push(new google.maps.Marker({position:{lat:e.lat,lng:e.lon},map:window.__gmap,title:t,icon:{path:google.maps.SymbolPath.CIRCLE,scale:5,fillColor:'#F5C542',fillOpacity:1,strokeColor:'#000',strokeWeight:1}}));
+        else if(window.__prahariMap) items.push(L.circleMarker([e.lat,e.lon],{radius:5,color:'#000',weight:1,fillColor:'#F5C542',fillOpacity:1}).bindTooltip('🏧 '+t).addTo(window.__prahariMap));});
+      toast(r.elements.length+' ATMs within 3 km of '+h.name);
+    }catch(e){ toast('ATM data unavailable: '+e.message); }
+  }
+  b.onclick=()=>{on=!on;b.classList.toggle('on',on); on?load():clear();};
+  setInterval(()=>{ if(on&&selectedHotspot&&selectedHotspot.id!==lastId) load(); },3000);
+})();
+</script>
+<script>
+/* ===== VEYRONIX add-on: live graphs in Simulation studio + Mule network ===== */
+(function(){
+  function hx(c,a){const n=parseInt(c.slice(1),16);return 'rgba('+(n>>16)+','+((n>>8)&255)+','+(n&255)+','+a+')';}
+  function line(cv,series,thr){ const x=cv.getContext('2d'),W=cv.width,H=cv.height,T=Date.now();
+    const bg=x.createLinearGradient(0,0,0,H); bg.addColorStop(0,'#0c2447'); bg.addColorStop(1,'#071428'); x.fillStyle=bg; x.fillRect(0,0,W,H);
+    x.lineWidth=1; for(let g=0;g<=W;g+=14){x.strokeStyle=g%70===0?'#2b5a9a88':'#1b3d6c66';x.beginPath();x.moveTo(g+.5,0);x.lineTo(g+.5,H);x.stroke();}
+    for(let g=0;g<=H;g+=14){x.strokeStyle=g%70===0?'#2b5a9a88':'#1b3d6c66';x.beginPath();x.moveTo(0,g+.5);x.lineTo(W,g+.5);x.stroke();}
+    x.strokeStyle='#5fa8ff';x.lineWidth=2;[[.22,.36,14],[.5,.2,20],[.74,.3,12]].forEach(t=>{x.globalAlpha=.45+.25*Math.sin(T/600+t[0]*9);x.beginPath();x.moveTo(t[0]*W,t[1]*H);x.lineTo(t[0]*W+t[2],t[1]*H);x.stroke();});x.globalAlpha=1;
+    if(thr){const ty=H-thr*(H-10)/100;x.strokeStyle='#ff4d4dbb';x.lineWidth=1;x.setLineDash([6,5]);x.beginPath();x.moveTo(0,ty);x.lineTo(W,ty);x.stroke();x.setLineDash([]);x.fillStyle='#ff6b6b';x.font='10px IBM Plex Mono,monospace';x.fillText('CRITICAL '+thr,W-78,ty-4);}
+    series.forEach(s=>{ const n=s.d.length,P=s.d.map((p,i)=>[i*W/(n-1),H-3-p*(H-10)/100]);
+      x.beginPath();x.moveTo(P[0][0],H);x.lineTo(P[0][0],P[0][1]);for(let i=1;i<n;i++){const mx=(P[i-1][0]+P[i][0])/2,my=(P[i-1][1]+P[i][1])/2;x.quadraticCurveTo(P[i-1][0],P[i-1][1],mx,my);}x.lineTo(P[n-1][0],P[n-1][1]);x.lineTo(P[n-1][0],H);x.closePath();
+      const f=x.createLinearGradient(0,0,0,H);f.addColorStop(0,hx(s.c,.7));f.addColorStop(1,hx(s.c,.08));x.fillStyle=f;x.fill();
+      x.shadowColor=s.c;x.shadowBlur=8;x.strokeStyle=s.c;x.lineWidth=2;x.beginPath();x.moveTo(P[0][0],P[0][1]);for(let i=1;i<n;i++){const mx=(P[i-1][0]+P[i][0])/2,my=(P[i-1][1]+P[i][1])/2;x.quadraticCurveTo(P[i-1][0],P[i-1][1],mx,my);}x.stroke();x.shadowBlur=0;
+      if(!s.nomark){let last=-99;for(let i=3;i<n-3;i++){const v=s.d[i];if(v>s.d[i-1]&&v>=s.d[i+1]&&v>s.d[i-3]+6&&v>s.d[i+3]+6&&i-last>8){last=i;const px=P[i][0],py=P[i][1];x.fillStyle='#fff';x.strokeStyle=s.c;x.lineWidth=2;x.beginPath();x.moveTo(px,py-6);x.lineTo(px+6,py);x.lineTo(px,py+6);x.lineTo(px-6,py);x.closePath();x.fill();x.stroke();}}}
+      if(!s.nomark){const p=P[n-1],r=4+2*Math.sin(T/250);x.fillStyle=hx(s.c,.35);x.beginPath();x.arc(p[0]-2,p[1],r+4,0,7);x.fill();x.fillStyle='#fff';x.beginPath();x.arc(p[0]-2,p[1],3,0,7);x.fill();} });
+    x.strokeStyle='#8fc1ff99';x.lineWidth=1;for(let k=0;k<4;k++){x.beginPath();x.moveTo(W-8-(4-k)*8,H-6-k*4);x.lineTo(W-6,H-6-k*4);x.stroke();} }
+  /* Simulation studio: lollipop-bar + area chart (blueprint style) */
+  const sb=document.getElementById('simB'); if(sb){ let jit=Array(14).fill(0),spark=Array(50).fill(50);
+    setInterval(()=>{ const x=sb.getContext('2d'),W=sb.width,H=sb.height,T=Date.now(),sel=document.getElementById('simDistrict'),t=+document.getElementById('simTeams').value,dy=+document.getElementById('simDays').value;
+      const h=(typeof hotspots!=='undefined'?hotspots:[]).find(o=>String(o.id)===String(sel&&sel.value))||{risk:60}; const o=(typeof simCalc==='function')?simCalc(h,t,dy):{intercept:60,funds:1};
+      const M=8,B=26,plotH=H-B-14; const vals=[]; let cum=0; const cums=[];
+      for(let i=0;i<dy;i++){ jit[i]+=(Math.random()-.5)*5; jit[i]*=.9; const v=Math.max(5,Math.min(98,o.intercept*(.5+.5*(1-Math.exp(-i/2.5)))+jit[i])); vals.push(v); cum+=v; cums.push(cum); }
+      const mx=cums[cums.length-1]||1;
+      const bg=x.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#0c2447');bg.addColorStop(1,'#071428');x.fillStyle=bg;x.fillRect(0,0,W,H);
+      x.lineWidth=1;for(let g=0;g<=W;g+=14){x.strokeStyle=g%70===0?'#2b5a9a88':'#1b3d6c66';x.beginPath();x.moveTo(g+.5,0);x.lineTo(g+.5,H-B+8);x.stroke();}
+      for(let g=0;g<=H-B+8;g+=14){x.strokeStyle=g%70===0?'#2b5a9a88':'#1b3d6c66';x.beginPath();x.moveTo(0,g+.5);x.lineTo(W,g+.5);x.stroke();}
+      const slot=(W-2*M)/dy, X=i=>M+slot*(i+.5), Y=v=>H-B-v*plotH/100;
+      /* cumulative area */
+      x.beginPath();x.moveTo(X(0),H-B);cums.forEach((c,i)=>x.lineTo(X(i),Y(c/mx*92)));x.lineTo(X(dy-1),H-B);x.closePath();
+      const f=x.createLinearGradient(0,0,0,H);f.addColorStop(0,'rgba(61,155,255,.55)');f.addColorStop(1,'rgba(31,95,214,.05)');x.fillStyle=f;x.fill();
+      x.strokeStyle='#3d9bff';x.lineWidth=2;x.shadowColor='#3d9bff';x.shadowBlur=8;x.beginPath();cums.forEach((c,i)=>i?x.lineTo(X(i),Y(c/mx*92)):x.moveTo(X(i),Y(c/mx*92)));x.stroke();x.shadowBlur=0;
+      /* bars with round heads */
+      const bw=Math.max(4,Math.min(12,slot*.3));
+      vals.forEach((v,i)=>{ const low=v<50,c=low?'#ff4d4d':'#7cc4ff',px=X(i),py=Y(v);
+        const g=x.createLinearGradient(0,py,0,H-B);g.addColorStop(0,low?'rgba(255,77,77,.9)':'rgba(124,196,255,.9)');g.addColorStop(1,'rgba(31,95,214,.35)');x.fillStyle=g;x.fillRect(px-bw/2,py,bw,H-B-py);
+        x.shadowColor=c;x.shadowBlur=8;x.fillStyle='#fff';x.strokeStyle=c;x.lineWidth=2.5;x.beginPath();x.arc(px,py,6+(i===dy-1?1.5*Math.sin(T/250):0),0,7);x.fill();x.stroke();x.shadowBlur=0;
+        x.fillStyle='#8fc1ff';x.font='9px IBM Plex Mono,monospace';x.textAlign='center';x.fillText('D'+(i+1),px,H-B+13); });
+      x.textAlign='left';
+      /* baseline rule + sparkline (bottom-left, like reference) */
+      x.strokeStyle='#3d9bff';x.lineWidth=2;x.beginPath();x.moveTo(0,H-B+1);x.lineTo(W,H-B+1);x.stroke();
+      const avg=vals.reduce((a,b)=>a+b,0)/vals.length; spark.push(avg); spark.shift();
+      x.strokeStyle='#8fc1ffcc';x.lineWidth=1.5;x.beginPath();spark.forEach((p,i)=>{const px=8+i*70/49,py=H-4-(p/100)*14;i?x.lineTo(px,py):x.moveTo(px,py);});x.stroke();
+      x.strokeStyle='#8fc1ff99';x.lineWidth=1;for(let k=0;k<3;k++){x.beginPath();x.moveTo(W-52+k*6,H-5-k*4);x.lineTo(W-8,H-5-k*4);x.stroke();}
+      document.getElementById('simBS').innerHTML=(h.name?h.name+' · ':'')+dy+' day window · avg interception <b style="color:#7cc4ff">'+avg.toFixed(0)+'%</b> · '+vals.filter(v=>v<50).length+' low day(s)'; },800); }
+  const N=90;
+  /* Simulation studio: risk index driven by sliders */
+  const sg=document.getElementById('simG'); if(sg){ let d=Array(N).fill(45),bd=Array(N).fill(45),v=45,sh=0;
+    setInterval(()=>{ const sel=document.getElementById('simDistrict'),t=+document.getElementById('simTeams').value,dy=+document.getElementById('simDays').value;
+      const h=(typeof hotspots!=='undefined'?hotspots:[]).find(o=>String(o.id)===String(sel&&sel.value)); const base=Math.max(8,(h?h.risk:60)*(1-t*.09-dy*.01));
+      if(Math.random()<.07) sh=14+Math.random()*22; v+=(base-v)*.06+sh*.4+(Math.random()-.5)*4; sh*=.6; v=Math.max(2,Math.min(99,v)); d.push(v); d.shift();
+      const c=v>75?'#ff4d4d':v>55?'#ffb020':'#3d9bff'; bd.push(base); bd.shift(); line(sg,[{d:bd,c:'#1f5fd6',nomark:true},{d:d,c:c}],75);
+      document.getElementById('simGS').innerHTML=(h?h.name+' · ':'')+'now <b style="color:'+c+'">'+v.toFixed(0)+'</b> · baseline '+base.toFixed(0)+' · '+t+' team(s), '+dy+' day(s)'; },800); }
+  /* Mule network: 3-series vulnerability with spikes */
+  const vg=document.getElementById('vulG'); if(vg){
+    const S=[{n:'Mule accounts',c:'#ff4d4d',v:40,k:.9},{n:'UPI / wallets',c:'#3d9bff',v:35,k:1.1},{n:'ATM cash-out',c:'#ffb020',v:30,k:.7}]; S.forEach(s=>s.d=Array(N).fill(s.v)); const sp=[0,0,0];
+    const ev=['credential-stuffing burst','rapid UPI layering','multi-ATM withdrawal cluster','new mule account batch','SIM-swap wave'];
+    setInterval(()=>{ S.forEach((s,i)=>{ if(Math.random()<.07){ sp[i]=18+Math.random()*30; document.getElementById('vulE').innerHTML='⚡ <b style="color:'+s.c+'">'+s.n+'</b>: '+ev[Math.floor(Math.random()*ev.length)]+' (+'+sp[i].toFixed(0)+')'; }
+        s.v+=(38-s.v)*.05+sp[i]*.5*s.k+(Math.random()-.5)*3; sp[i]*=.55; s.v=Math.max(2,Math.min(99,s.v)); s.d.push(s.v); s.d.shift(); });
+      line(vg,S,80); document.getElementById('vulL').innerHTML=S.map(s=>'<span><b style="color:'+s.c+'">●</b> '+s.n+' '+s.v.toFixed(0)+(s.v>80?' 🔴':'')+'</span>').join(''); },800); }
+})();
 </script>
 </body>
 </html>
